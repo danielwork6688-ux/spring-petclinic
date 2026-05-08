@@ -42,18 +42,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sshagent(['app-vm-ssh']) {
-                    sh '''
-                        scp -o StrictHostKeyChecking=no target/spring-petclinic-*.jar ${APP_USER}@${APP_SERVER}:${APP_DIR}/petclinic.jar
-                        ssh -o StrictHostKeyChecking=no ${APP_USER}@${APP_SERVER} 'bash -s' << 'EOF'
-                            pkill -f petclinic || true
-                            sleep 2
-                            nohup java -jar /opt/petclinic/petclinic.jar > /tmp/petclinic.log 2>&1 &
-                            disown
-                            exit 0
-EOF
-                    '''
-                }
+                sh 'ansible-playbook -i /var/lib/jenkins/ansible/inventory.ini /var/lib/jenkins/ansible/deploy.yml'
             }
         }
     }
