@@ -65,16 +65,36 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to AKS') {
             steps {
-                sh 'ansible-playbook -i ${WORKSPACE}/ansible/inventory.ini ${WORKSPACE}/ansible/deploy.yml'
+                withCredentials([
+                    string(credentialsId: 'acr-app-id', variable: 'ACR_APP_ID'),
+                    string(credentialsId: 'acr-secret', variable: 'ACR_SECRET')
+                ]) {
+                    sh '''
+                        az login --service-principal \
+                            --username $ACR_APP_ID \
+                            --password $ACR_SECRET \
+                            --tenant ''' + env.TENANT_ID + '''
+
+                        az aks get-credentials \
+                            --resource-group daniel-cicd \
+                            --name petclinic-aks \
+                            --overwrite-existing
+
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+
+                        kubectl rollout status deployment/petclinic
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Deployment successful! App is running on App VM.'
+            echo 'Deployment successful! PetClinic is running on AKS.'
         }
         failure {
             echo 'Pipeline failed. Check the logs.'
