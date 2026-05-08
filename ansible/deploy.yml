@@ -1,4 +1,4 @@
-﻿---
+---
 - name: Deploy Spring PetClinic
   hosts: app_servers
   become: false
