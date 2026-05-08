@@ -1,0 +1,36 @@
+﻿---
+- name: Deploy Spring PetClinic
+  hosts: app_servers
+  become: false
+
+  tasks:
+    - name: Stop existing PetClinic process
+      shell: pkill -f petclinic || true
+      ignore_errors: yes
+
+    - name: Wait for process to stop
+      pause:
+        seconds: 2
+
+    - name: Copy JAR to app server
+      copy:
+        src: /var/lib/jenkins/workspace/spring-petclinic/target/spring-petclinic-4.0.0-SNAPSHOT.jar
+        dest: /opt/petclinic/petclinic.jar
+        mode: '0755'
+
+    - name: Start PetClinic application
+      shell: nohup java -jar /opt/petclinic/petclinic.jar > /tmp/petclinic.log 2>&1 &
+      async: 0
+      poll: 0
+
+    - name: Wait for app to start
+      pause:
+        seconds: 5
+
+    - name: Verify app is running
+      shell: pgrep -f petclinic
+      register: app_status
+
+    - name: Print app status
+      debug:
+        msg: "PetClinic is running with PID {{ app_status.stdout }}"
