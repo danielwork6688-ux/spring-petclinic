@@ -8,9 +8,10 @@ pipeline {
     environment {
         JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-17.0.19.0.10-2.el9.alma.1.x86_64'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
-        APP_SERVER = '10.0.0.5'
-        APP_USER = 'azureuser'
-        APP_DIR = '/opt/petclinic'
+        ACR_NAME = 'petclinicregistry68.azurecr.io'
+        IMAGE_NAME = 'spring-petclinic'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        TENANT_ID = '0bbb7513-9735-4c74-8c79-a851844820ad'
     }
 
     stages {
@@ -40,9 +41,33 @@ pipeline {
             }
         }
 
+        stage('Docker Build & Push to ACR') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'acr-app-id', variable: 'ACR_APP_ID'),
+                    string(credentialsId: 'acr-secret', variable: 'ACR_SECRET')
+                ]) {
+                    sh '''
+                        az login --service-principal \
+                            --username $ACR_APP_ID \
+                            --password $ACR_SECRET \
+                            --tenant ''' + env.TENANT_ID + '''
+
+                        az acr login --name petclinicregistry68
+
+                        docker build -t $ACR_NAME/$IMAGE_NAME:$IMAGE_TAG .
+                        docker build -t $ACR_NAME/$IMAGE_NAME:latest .
+
+                        docker push $ACR_NAME/$IMAGE_NAME:$IMAGE_TAG
+                        docker push $ACR_NAME/$IMAGE_NAME:latest
+                    '''
+                }
+            }
+        }
+
         stage('Deploy') {
             steps {
-                sh 'ansible-playbook -i /var/lib/jenkins/ansible/inventory.ini /var/lib/jenkins/ansible/deploy.yml'
+                sh 'ansible-playbook -i ${WORKSPACE}/ansible/inventory.ini ${WORKSPACE}/ansible/deploy.yml'
             }
         }
     }
